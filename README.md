@@ -8,10 +8,6 @@
 
 ![超级终端与命令解读](docs/screenshots/super-terminal.jpg)
 
-**大模型网关设置(自定义地址 / Key / 模型)**
-
-![大模型网关设置](docs/screenshots/llm-settings.jpg)
-
 ## 功能
 
 - 终端:`xterm.js`,通过 WebSocket 连到后端,后端用 `ssh2` 建立真实 SSH 会话;不打印"正在连接/已连接"这类自带提示语,并且默认隐藏远端的登录横幅(MOTD,比如 Ubuntu 的 "Welcome to..." 系统信息)——这段是服务器自己发的(用 Xshell/Terminal 连同一台机器也会看到),不是我们额外加的,只是客户端把它隐藏掉,直接看到干净的 shell 提示符
