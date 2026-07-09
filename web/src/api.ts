@@ -141,6 +141,7 @@ export interface SecurityStatus {
 export interface ImportResult {
   imported: number
   skipped: string[]
+  groupsCreated?: number
 }
 
 const TOKEN_KEY = 'ssh_web_token'
@@ -274,8 +275,11 @@ export const api = {
     return data as ImportResult
   },
 
-  async exportConnections(ids?: string[]) {
-    const qs = ids && ids.length ? `?ids=${encodeURIComponent(ids.join(','))}` : ''
+  async exportConnections(ids?: string[], format: 'xsh' | 'json' = 'xsh') {
+    const params = new URLSearchParams()
+    if (ids && ids.length) params.set('ids', ids.join(','))
+    if (format === 'json') params.set('format', 'json')
+    const qs = params.toString() ? `?${params.toString()}` : ''
     const resp = await fetch(`/api/connections/export${qs}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     })
@@ -285,7 +289,7 @@ export const api = {
     }
     const disp = resp.headers.get('Content-Disposition') || ''
     const m = disp.match(/filename="?([^"]+)"?/)
-    const filename = m ? decodeURIComponent(m[1]) : 'connections.zip'
+    const filename = m ? decodeURIComponent(m[1]) : format === 'json' ? 'connections-backup.json' : 'connections.zip'
     const blob = await resp.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

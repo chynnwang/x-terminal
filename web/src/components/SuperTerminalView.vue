@@ -100,7 +100,7 @@ async function copy() {
   flex: none;
   background: var(--bg-soft);
   border-top: 1px solid rgba(79, 140, 255, 0.55);
-  padding: 10px 14px;
+  padding: 5px 10px;
 }
 .row {
   display: flex;
@@ -140,46 +140,46 @@ async function copy() {
   color: var(--danger);
 }
 .result {
-  margin-top: 8px;
+  margin-top: 5px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-radius: 8px;
+  padding: 6px 9px;
 }
 .result-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 .cmd {
   flex: 1;
   font-family: monospace;
-  font-size: 12px;
+  font-size: 13px;
   color: #e6b673;
   word-break: break-all;
 }
 .explain {
-  margin-top: 5px;
-  font-size: 11px;
+  margin-top: 6px;
+  font-size: 12px;
   color: var(--text-dim);
-  line-height: 1.4;
+  line-height: 1.5;
 }
 .risk-notes {
-  margin-top: 5px;
+  margin-top: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--caution);
 }
 .actions {
-  margin-top: 8px;
+  margin-top: 6px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
+/* 操作按钮做小一点,不抢视觉焦点 */
 .actions .btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 11px;
 }
 </style>

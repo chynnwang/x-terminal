@@ -43,9 +43,51 @@ function persistTermSettings(s: TermSettings) {
 }
 const termSettings = ref<TermSettings>(loadTermSettings())
 
+// 主机侧栏宽度(可拖拽右边缘调整),存 localStorage 持久化
+const SIDEBAR_WIDTH_KEY = 'ssh_web_sidebar_width'
+const DEFAULT_SIDEBAR_WIDTH = 240
+const sidebarWidth = ref(Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || DEFAULT_SIDEBAR_WIDTH)
+let sidebarResizeStartWidth = 0
+let sidebarResizeRaf: number | null = null
+let sidebarPendingDelta = 0
+const sidebarDragging = ref(false)
+function onSidebarResizeDown(e: MouseEvent) {
+  sidebarDragging.value = true
+  sidebarResizeStartWidth = sidebarWidth.value
+  const startX = e.clientX
+  const onMove = (ev: MouseEvent) => {
+    sidebarPendingDelta = ev.clientX - startX
+    if (sidebarResizeRaf !== null) return
+    sidebarResizeRaf = window.requestAnimationFrame(() => {
+      sidebarResizeRaf = null
+      const next = sidebarResizeStartWidth + sidebarPendingDelta
+      sidebarWidth.value = Math.max(180, Math.min(next, window.innerWidth - 320))
+    })
+  }
+  const onUp = () => {
+    sidebarDragging.value = false
+    if (sidebarResizeRaf !== null) {
+      window.cancelAnimationFrame(sidebarResizeRaf)
+      sidebarResizeRaf = null
+    }
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth.value))
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    nextTick(() => {
+      for (const ref of terminalRefs.values()) (ref as any)?.refit?.()
+    })
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+  document.body.style.userSelect = 'none'
+  document.body.style.cursor = 'col-resize'
+}
+
 // 命令解读面板的高度(可拖拽分隔条调整),也存 localStorage 持久化
 const PANEL_HEIGHT_KEY = 'ssh_web_panel_height'
-const DEFAULT_PANEL_HEIGHT = 170
+const DEFAULT_PANEL_HEIGHT = 150
 const panelHeight = ref(Number(localStorage.getItem(PANEL_HEIGHT_KEY)) || DEFAULT_PANEL_HEIGHT)
 let resizeStartHeight = 0
 let resizeRaf: number | null = null
@@ -271,7 +313,7 @@ function onRunSnippet(sessionId: string, command: string) {
     </div>
 
     <div class="body">
-      <div v-show="tab === 'terminal'" class="layout">
+      <div v-show="tab === 'terminal'" class="layout" :style="{ gridTemplateColumns: sidebarWidth + 'px 1fr' }">
         <div class="col-hosts">
           <HostList
             :active-id="activeSession?.hostId ?? null"
@@ -281,6 +323,12 @@ function onRunSnippet(sessionId: string, command: string) {
             @update="onHostUpdated"
             @removed="onHostRemoved"
           />
+          <div
+            class="sidebar-resizer"
+            :class="{ dragging: sidebarDragging }"
+            title="按住左右拖动可调整主机列表宽度"
+            @mousedown="onSidebarResizeDown"
+          ></div>
         </div>
         <div class="col-main">
           <div v-if="sessions.length" class="session-tabs">
@@ -505,6 +553,35 @@ function onRunSnippet(sessionId: string, command: string) {
   display: grid;
   grid-template-columns: 240px 1fr;
   height: 100%;
+}
+.col-hosts {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+}
+.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 2px;
+  width: 2px;
+  height: 100%;
+  background: transparent;
+  transition: background 0.15s;
+}
+.sidebar-resizer:hover::before,
+.sidebar-resizer.dragging::before {
+  background: var(--accent);
 }
 .col-main {
   min-width: 0;

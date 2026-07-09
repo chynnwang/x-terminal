@@ -4,6 +4,7 @@ import busboy from 'busboy'
 import { login, requireAuth } from './auth.js'
 import { listHosts, createHost, updateHost, deleteHost, clearHostsGroup, getHost, DEVICE_TYPES, type HostInput, type DeviceType } from './store.js'
 import { parseXsh, buildXsh, safeFileName } from './xshell.js'
+import { buildBackup, parseBackup } from './backupFormat.js'
 import { analyzeLocal, type RiskLevel } from './riskEngine.js'
 import { analyzeWithLlm, nl2cmd } from './llm.js'
 import { explainLocal, getCommandHint } from './localExplain.js'
@@ -290,14 +291,24 @@ router.get('/hosts/:id/stats', requireAuth, async (req, res) => {
 })
 
 // ---- 连接导入/导出(兼容 Xshell,仅非密码字段) ----
-// 导出:选中主机(ids 逗号分隔,不传则全部)。单台直接下 .xsh,多台打包 .zip。
+// 导出:选中主机(ids 逗号分隔,不传则全部)。
+// format=json 导出本工具的 JSON 备份(单文件,含分组);默认 format=xsh 兼容 Xshell(单台 .xsh,多台打包 .zip)。
 router.get('/connections/export', requireAuth, async (req, res) => {
   const idsParam = typeof req.query.ids === 'string' ? req.query.ids : ''
   const ids = idsParam ? idsParam.split(',').map((s) => s.trim()).filter(Boolean) : []
+  const format = req.query.format === 'json' ? 'json' : 'xsh'
   let hosts = listHosts()
   if (ids.length) hosts = hosts.filter((h) => ids.includes(h.id))
   if (!hosts.length) {
     res.status(404).json({ error: '没有可导出的主机' })
+    return
+  }
+
+  if (format === 'json') {
+    const content = buildBackup(hosts, listGroups())
+    res.setHeader('Content-Type', 'application/json')
+    res.setHeader('Content-Disposition', `attachment; filename="connections-backup.json"`)
+    res.send(content)
     return
   }
 
@@ -328,23 +339,61 @@ router.get('/connections/export', requireAuth, async (req, res) => {
   await archive.finalize()
 })
 
-// 导入:multipart/form-data,可上传多个 .xsh 文件。解析非密码字段后创建主机,密码留空待补填。
+// 导入:multipart/form-data,可上传多个文件。支持 Xshell .xsh(仅非密码字段,不含分组)
+// 和本工具的 .json 备份(含分组,自动按名称匹配/新建分组)。密码留空待补填。
 router.post('/connections/import', requireAuth, (req, res) => {
-  const parsed: { content: string; name: string }[] = []
-  const bb = busboy({ headers: req.headers, limits: { files: 50, fileSize: 1024 * 1024 } })
+  const parsed: { content: string; name: string; filename: string }[] = []
+  const bb = busboy({ headers: req.headers, limits: { files: 50, fileSize: 5 * 1024 * 1024 } })
 
   bb.on('file', (_name, stream, info) => {
     const chunks: Buffer[] = []
-    const base = (info.filename || '').replace(/\.[^.]+$/, '')
+    const filename = info.filename || ''
+    const base = filename.replace(/\.[^.]+$/, '')
     stream.on('data', (c: Buffer) => chunks.push(c))
-    stream.on('end', () => parsed.push({ content: Buffer.concat(chunks).toString('utf8'), name: base }))
+    stream.on('end', () => parsed.push({ content: Buffer.concat(chunks).toString('utf8'), name: base, filename }))
     stream.on('error', () => {})
   })
 
   bb.on('close', () => {
     let imported = 0
+    let groupsCreated = 0
     const skipped: string[] = []
+    const groupIdByName = new Map(listGroups().map((g) => [g.name, g.id]))
+
+    function resolveGroupId(name: string | null): string | null {
+      if (!name) return null
+      const existing = groupIdByName.get(name)
+      if (existing) return existing
+      const g = createGroup(name)
+      groupIdByName.set(name, g.id)
+      groupsCreated++
+      return g.id
+    }
+
     for (const f of parsed) {
+      if (f.filename.toLowerCase().endsWith('.json')) {
+        const backup = parseBackup(f.content)
+        if (!backup) {
+          skipped.push(f.name || '(未命名)')
+          continue
+        }
+        for (const h of backup.hosts) {
+          createHost({
+            label: h.label,
+            host: h.host,
+            port: h.port,
+            username: h.username,
+            authType: h.authType,
+            groupId: resolveGroupId(h.group),
+            deviceType: h.deviceType,
+            secret: h.secret || '',
+            passphrase: h.passphrase,
+          })
+          imported++
+        }
+        continue
+      }
+
       const conn = parseXsh(f.content, f.name)
       if (!conn) {
         skipped.push(f.name || '(未命名)')
@@ -362,7 +411,7 @@ router.post('/connections/import', requireAuth, (req, res) => {
       })
       imported++
     }
-    res.json({ imported, skipped })
+    res.json({ imported, skipped, groupsCreated })
   })
 
   bb.on('error', (e: any) => {

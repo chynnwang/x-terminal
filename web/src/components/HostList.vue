@@ -60,6 +60,17 @@ function isOpen(id: string): boolean {
   return Boolean(props.openIds?.includes(id)) && id !== props.activeId
 }
 
+// 当前安全模式:仅在设置了密码(mode==='password')时才显示「退出登录」;免密模式下退出没有意义
+const securityMode = ref<SecurityMode>('none')
+async function loadSecurityMode() {
+  try {
+    const s = await api.securityStatus()
+    securityMode.value = s.mode
+  } catch {
+    /* 拿不到时按免密处理,不显示退出按钮 */
+  }
+}
+
 async function load() {
   try {
     const [h, g] = await Promise.all([api.listHosts(), api.listGroups()])
@@ -69,20 +80,13 @@ async function load() {
     error.value = e.message
   }
 }
-onMounted(load)
+onMounted(() => {
+  load()
+  loadSecurityMode()
+})
 
-// 免密模式下,「退出登录」点了也会立刻自动免密重新进入,没有意义,所以只在密码模式下展示这个按钮
-const securityMode = ref<SecurityMode>('password')
-async function loadSecurityMode() {
-  try {
-    const s = await api.securityStatus()
-    securityMode.value = s.mode
-  } catch {
-    /* 查询失败时保守起见按密码模式处理,不隐藏按钮 */
-  }
-}
-onMounted(loadSecurityMode)
-function onSecurityModalClose() {
+// 安全设置弹窗关闭后,密码模式可能已被开启/关闭,重新拉一次状态以同步退出按钮的显隐
+function onSecurityClosed() {
   showSecurity.value = false
   loadSecurityMode()
 }
@@ -208,7 +212,8 @@ async function onImportFiles(e: Event) {
     const r = await api.importConnections(files)
     await load()
     const skipMsg = r.skipped.length ? `,${r.skipped.length} 个文件无法识别(已跳过)` : ''
-    alert(`已导入 ${r.imported} 台主机${skipMsg}。请为导入的主机补填密码后再连接。`)
+    const groupMsg = r.groupsCreated ? `,新建 ${r.groupsCreated} 个分组` : ''
+    alert(`已导入 ${r.imported} 台主机${groupMsg}${skipMsg}。请为导入的主机补填密码后再连接。`)
   } catch (e: any) {
     error.value = e.message || '导入失败'
   }
@@ -221,11 +226,25 @@ async function doExport() {
     return
   }
   try {
-    await api.exportConnections() // 不传 ids = 导出全部
+    await api.exportConnections() // 不传 ids = 导出全部,Xshell 兼容格式
   } catch (e: any) {
     error.value = e.message || '导出失败'
   }
 }
+
+async function doExportBackup() {
+  error.value = ''
+  if (!hosts.value.length) {
+    error.value = '还没有主机可导出'
+    return
+  }
+  try {
+    await api.exportConnections(undefined, 'json') // 本工具 JSON 备份,含分组
+  } catch (e: any) {
+    error.value = e.message || '导出失败'
+  }
+}
+
 </script>
 
 <template>
@@ -276,7 +295,6 @@ async function doExport() {
           >
             <div class="item-main">
               <div class="label"><span v-if="isOpen(h.id)" class="open-dot" /> {{ h.label || h.host }}</div>
-              <div class="addr">{{ h.username }}@{{ h.host }}:{{ h.port }}</div>
             </div>
             <div class="item-actions">
               <button class="mini" title="编辑" @click.stop="openEdit(h)">✎</button>
@@ -287,6 +305,7 @@ async function doExport() {
       </template>
 
       <div v-if="grouped.ungrouped.length || !groups.length" class="group-head plain">
+        <span class="arrow-spacer"></span>
         <span class="group-name">未分组</span>
       </div>
       <div
@@ -298,7 +317,6 @@ async function doExport() {
       >
         <div class="item-main">
           <div class="label"><span v-if="isOpen(h.id)" class="open-dot" /> {{ h.label || h.host }}</div>
-          <div class="addr">{{ h.username }}@{{ h.host }}:{{ h.port }}</div>
         </div>
         <div class="item-actions">
           <button class="mini" title="编辑" @click.stop="openEdit(h)">✎</button>
@@ -313,8 +331,9 @@ async function doExport() {
 
     <div class="footer">
       <div class="footer-row">
-        <button class="foot-btn" title="从 Xshell 会话文件(.xsh)导入连接(仅非密码字段)" @click="triggerImport">导入连接</button>
-        <button class="foot-btn" title="导出全部连接为 Xshell 会话文件(不含密码)" @click="doExport">导出连接</button>
+        <button class="foot-btn" title="支持 Xshell 会话文件(.xsh,仅非密码字段)或本工具的 .json 备份(含分组)" @click="triggerImport">导入连接</button>
+        <button class="foot-btn" title="导出全部连接为 Xshell 会话文件(不含密码,不含分组)" @click="doExport">导出连接</button>
+        <button class="foot-btn" title="导出本工具 JSON 备份(含分组信息,不含密码)" @click="doExportBackup">导出备份</button>
       </div>
       <button class="foot-btn icon-text" title="修改密码 / 开关密码验证" @click="showSecurity = true">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -329,13 +348,13 @@ async function doExport() {
     <input
       ref="importInput"
       type="file"
-      accept=".xsh"
+      accept=".xsh,.json"
       multiple
       style="display: none"
       @change="onImportFiles"
     />
 
-    <SecurityModal v-if="showSecurity" @close="onSecurityModalClose" />
+    <SecurityModal v-if="showSecurity" @close="onSecurityClosed" />
 
     <!-- 主机表单 -->
     <div v-if="showForm" class="modal-mask" @click.self="showForm = false">
@@ -469,6 +488,10 @@ async function doExport() {
   justify-content: center;
   color: var(--text);
 }
+.arrow-spacer {
+  width: 22px;
+  flex: none;
+}
 .group-name {
   font-weight: 600;
   flex: 1;
@@ -517,11 +540,6 @@ async function doExport() {
 }
 .label {
   font-weight: 500;
-}
-.addr {
-  color: var(--text-dim);
-  font-size: 12px;
-  margin-top: 2px;
 }
 .item-actions {
   display: flex;
