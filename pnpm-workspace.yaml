@@ -1,0 +1,10 @@
+packages:
+  - server
+  - web
+  - desktop
+allowBuilds:
+  better-sqlite3: true
+  cpu-features: true
+  electron: true
+  esbuild: true
+  ssh2: true

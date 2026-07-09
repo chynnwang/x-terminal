@@ -1,0 +1,52 @@
+{
+  "name": "desktop",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "X terminal 桌面客户端(Electron 内嵌 Node 后端)",
+  "main": "dist/main.js",
+  "scripts": {
+    "build:server": "pnpm --filter server build && node scripts/bundle-server.mjs",
+    "build:web": "pnpm --filter web build",
+    "build:main": "tsc -p tsconfig.json",
+    "prepare:all": "pnpm run build:server && pnpm run build:web && pnpm run build:main",
+    "pack:mac": "pnpm run prepare:all && electron-builder --mac dmg",
+    "pack:win": "pnpm run prepare:all && electron-builder --win nsis",
+    "start": "pnpm run prepare:all && electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.5"
+  },
+  "build": {
+    "appId": "com.xterminal.desktop",
+    "productName": "X terminal",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/main.js"
+    ],
+    "extraResources": [
+      { "from": "dist/server.mjs", "to": "server.mjs" },
+      { "from": "../web/dist", "to": "web" }
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.developer-tools",
+      "artifactName": "X-terminal-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": "nsis",
+      "artifactName": "X-terminal-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

@@ -1,0 +1,102 @@
+:root {
+  --bg: #0f1115;
+  --bg-soft: #171a21;
+  --bg-panel: #1b1f28;
+  --border: #2a2f3a;
+  --text: #d7dae0;
+  --text-dim: #8b93a1;
+  --accent: #4f8cff;
+  --safe: #3fb950;
+  --caution: #d29922;
+  --danger: #f85149;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+}
+.btn:hover {
+  filter: brightness(1.1);
+}
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn.danger {
+  background: var(--danger);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  width: 100%;
+  font-family: inherit;
+}
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.tag.safe {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--safe);
+}
+.tag.caution {
+  background: rgba(210, 153, 34, 0.15);
+  color: var(--caution);
+}
+.tag.danger {
+  background: rgba(248, 81, 73, 0.15);
+  color: var(--danger);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2f3542;
+  border-radius: 4px;
+}

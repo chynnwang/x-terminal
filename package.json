@@ -1,0 +1,24 @@
+{
+  "name": "ssh-web-terminal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "带 AI 命令风险提示的 Web/桌面 SSH 终端(xterm.js + ssh2 + Electron)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chynnwang/x-terminal.git"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"pnpm --filter server dev\" \"pnpm --filter web dev\"",
+    "dev:server": "pnpm --filter server dev",
+    "dev:web": "pnpm --filter web dev",
+    "build": "pnpm --filter server build && pnpm --filter web build",
+    "start": "pnpm --filter server start",
+    "desktop:dev": "pnpm --filter desktop start",
+    "build:desktop": "pnpm --filter desktop pack:mac",
+    "build:desktop:win": "pnpm --filter desktop pack:win"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
